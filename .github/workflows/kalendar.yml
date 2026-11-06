@@ -1,5 +1,5 @@
-# Hourly: build the Underground calendar and publish it on GitHub Pages.
-# A failed download fails the run before deploy, so the last good calendar stays online.
+# Hourly: build the Underground and Južna Primorska calendars and publish them on GitHub Pages.
+# A failed download fails the run before deploy, so the last good calendars stay online.
 name: Kalendar
 on:
   schedule:
@@ -26,7 +26,7 @@ jobs:
       # Kulturnik sometimes answers 502 for a moment, so retry once
       - run: |
           mkdir site
-          dotnet run app.cs -- --ics site/underground.ics || { sleep 60; dotnet run app.cs -- --ics site/underground.ics; }
+          dotnet run app.cs -- --ics site || { sleep 60; dotnet run app.cs -- --ics site; }
       - uses: actions/upload-pages-artifact@v5
         with:
           path: site

@@ -125,15 +125,20 @@ Na namizju se pojavi bližnjica Glasba z ikono note. Če jo želite v opravilni 
 - Izbrani datum in filtri so del naslova strani, zato lahko izbiro shranite med zaznamke.
 - Aplikacija se sama ugasne po 30 minutah brez obiska. Naslednji klik na ikono jo znova zažene.
 
-## Koledar Underground
+## Koledarja Underground in Južna Primorska
 
-Dogodke prizorišč Underground (od 7 dni nazaj do 28 dni naprej) lahko dobite v aplikacijo Koledar. Koledar se osveži vsako uro na GitHubu, zato vaš računalnik pri tem ni potreben.
+Dogodke (od 7 dni nazaj do 28 dni naprej) lahko dobite v aplikacijo Koledar. Na voljo sta dva koledarja:
+
+- **Underground:** prizorišča Underground v Ljubljani, `https://tr0nky.github.io/kulturnik-glasba/underground.ics`
+- **Južna Primorska:** vsi glasbeni dogodki na Obali, Krasu in v okolici Postojne, `https://tr0nky.github.io/kulturnik-glasba/primorska.ics`
+
+Koledarja se osvežita vsako uro na GitHubu, zato vaš računalnik pri tem ni potreben.
 
 1. V aplikaciji Koledar na Macu izberite **Datoteka → Nova naročnina na koledar** (v angleščini **File → New Calendar Subscription**).
-2. Vpišite naslov `https://tr0nky.github.io/kulturnik-glasba/underground.ics` in kliknite **Naroči se**.
+2. Vpišite naslov koledarja in kliknite **Naroči se**.
 3. Pri **Lokacija** izberite **iCloud**, pri **Samodejno osveževanje** pa **Vsako uro**. Koledar se tako prikaže tudi na iPhonu in iPadu.
 
-Na isti naslov se lahko naroči kdorkoli. Če na GitHubu 60 dni ni nobene spremembe, GitHub urno osveževanje ustavi in pošlje e-pošto z gumbom za ponovni vklop.
+Na ista naslova se lahko naroči kdorkoli. Če na GitHubu 60 dni ni nobene spremembe, GitHub urno osveževanje ustavi in pošlje e-pošto z gumbom za ponovni vklop.
 
 ## Težave
 

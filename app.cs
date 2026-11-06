@@ -37,7 +37,7 @@ app.MapGet("/", async (string? datum, string? scena, string? zanr) =>
     try
     {
         var events = await Cached(day, async () =>
-            await LoadEvents(day, day.AddDays(UpcomingDays), (await Cached("genres", LoadGenres))!, FetchDay));
+            await LoadEvents(day, day.AddDays(UpcomingDays), (await Cached("genres", LoadGenres))!, when => FetchDay(when, "Osrednja Slovenija")));
         return Results.Text(Render(events!, day, today, scena, zanr), "text/html");
     }
     catch (Exception e) when (IsFetchError(e))
@@ -54,18 +54,26 @@ Task<T?> Cached<T>(object key, Func<Task<T>> load) => cache.GetOrCreateAsync(key
     return load();
 });
 
-// For a local Calendar subscription test; GitHub publishes the same file via --ics
-app.MapGet("/underground.ics", async () => Results.Text((await Cached("ics", CalendarFile))!, "text/calendar"));
+// Published calendars: file name, Kulturnik region, venues ("" matches every venue)
+(string File, string Region, Scene Scene)[] calendars =
+[
+    ("underground.ics", "Osrednja Slovenija", Scenes.All[0]),
+    ("primorska.ics", "Južna Primorska", new("primorska", "Južna Primorska", [""])),
+];
 
-async Task<XDocument> FetchDay(DateOnly when) => XDocument.Parse(await http.GetStringAsync(
-    $"https://dogodki.kulturnik.si/?what=glasba&when={when:O}&where=Osrednja%20Slovenija&format=rss"));
+// For a local Calendar subscription test; GitHub publishes the same files via --ics
+foreach (var calendar in calendars)
+    app.MapGet("/" + calendar.File, async () => Results.Text((await Cached(calendar.File, () => CalendarFile(calendar.Region, calendar.Scene)))!, "text/calendar"));
 
-async Task<string> CalendarFile()
+async Task<XDocument> FetchDay(DateOnly when, string region) => XDocument.Parse(await http.GetStringAsync(
+    $"https://dogodki.kulturnik.si/?what=glasba&when={when:O}&where={Uri.EscapeDataString(region)}&format=rss"));
+
+async Task<string> CalendarFile(string region, Scene scene)
 {
     var today = Day(TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, ljubljana));
     var (from, to) = (today.AddDays(-CalendarPastDays), today.AddDays(CalendarDays));
-    var events = await LoadEvents(from, to, (await Cached("genres", LoadGenres))!, FetchDay);
-    return Ics(events, Scenes.All[0], from, to, DateTimeOffset.UtcNow);
+    var events = await LoadEvents(from, to, (await Cached("genres", LoadGenres))!, when => FetchDay(when, region));
+    return Ics(events, scene, from, to, DateTimeOffset.UtcNow);
 }
 
 // Genres only drive one filter, so the page still works without them
@@ -82,11 +90,12 @@ async Task<Dictionary<string, string>> LoadGenres()
     }
 }
 
-// GitHub Actions runs this hourly and publishes the file for the iCloud subscription.
-// A failed download throws, so a broken run never replaces the published calendar.
-if (args is ["--ics", var path])
+// GitHub Actions runs this hourly and publishes the files for the iCloud subscriptions.
+// A failed download throws, so a broken run never replaces the published calendars.
+if (args is ["--ics", var dir])
 {
-    await File.WriteAllTextAsync(path, await CalendarFile());
+    foreach (var calendar in calendars)
+        await File.WriteAllTextAsync(Path.Combine(dir, calendar.File), await CalendarFile(calendar.Region, calendar.Scene));
     return;
 }
 
