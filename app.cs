@@ -150,14 +150,42 @@ static async Task<List<Event>> LoadEvents(DateOnly from, DateOnly to, Dictionary
         if (last > to || last <= when) break;
         when = last;
     }
-    return events;
+    return Merge(events);
+}
+
+// Feeds overlap and repeat running events. Kulturnik also lists some concerts once per source,
+// under different titles: same start, same venue up to the first comma, and at least half the
+// words of the shorter title in common. The copy with a genre wins and keeps its id (calendar UID).
+static List<Event> Merge(IEnumerable<Event> events)
+{
+    List<List<Event>> groups = [];
+    foreach (var e in events.Distinct())
+        if (groups.Find(g => SameEvent(g[0], e)) is { } group) group.Add(e);
+        else groups.Add([e]);
+    return [.. groups.Select(g =>
+    {
+        var best = g.OrderBy(e => e.Genre is null).ThenBy(e => e.Image is null).ThenBy(e => e.Id, StringComparer.Ordinal).First();
+        return best with { Url = best.Url ?? g.Find(e => e.Url is not null)?.Url, Image = best.Image ?? g.Find(e => e.Image is not null)?.Image };
+    })];
+}
+
+static bool SameEvent(Event a, Event b)
+{
+    static string Venue(Event e) => e.Location.Split(',')[0].Trim();
+    static HashSet<string> Words(string s) => [.. Regex.Matches(s.ToLowerInvariant(), @"\p{L}{3,}").Select(m => m.Value)];
+    if (a.Start != b.Start) return false;
+    var (va, vb) = (Venue(a), Venue(b));
+    if (va is "" || vb is "" || !(va.StartsWith(vb, StringComparison.OrdinalIgnoreCase) || vb.StartsWith(va, StringComparison.OrdinalIgnoreCase))) return false;
+    var (wa, wb) = (Words(a.Title), Words(b.Title));
+    var shared = wa.Intersect(wb).Count();
+    return shared > 0 && 2 * shared >= Math.Min(wa.Count, wb.Count);
 }
 
 static string Render(IEnumerable<Event> events, DateOnly day, DateOnly today, string? scena = null, string? zanr = null)
 {
     var end = day.AddDays(UpcomingDays);
     var datum = day == today ? null : day.ToString("O");
-    var inRange = events.Distinct().Where(e => Day(e.End) >= day && Day(e.Start) <= end).ToList(); // Feeds overlap, and repeat running events
+    var inRange = events.Where(e => Day(e.End) >= day && Day(e.Start) <= end).ToList();
     var genres = inRange.Where(e => e.Genre is not null).GroupBy(e => e.Genre!).OrderByDescending(g => g.Count()).Select(g => g.Key).ToList();
     var scene = Scenes.All.FirstOrDefault(s => s.Slug == scena);
     var genre = genres.FirstOrDefault(g => g == zanr);
@@ -405,6 +433,15 @@ static async Task SelfCheck()
         if (html.Contains(forbidden)) throw new Exception($"leaked: {forbidden}\n{html}");
     if (html.Split("<li>").Length - 1 != 5) throw new Exception($"expected 5 rows\n{html}");
     if (!fetched.SequenceEqual([today, new DateOnly(2026, 11, 13)])) throw new Exception($"walk: {string.Join(", ", fetched)}");
+
+    static Event At(string title, string location, string? genre = null) =>
+        new(title, title, null, location, null, genre, new DateTimeOffset(2026, 11, 6, 19, 30, 0, TimeSpan.FromHours(1)), default);
+    var merged = Merge([
+        At("FKK 2: Virtuozno", "Cankarjev dom, Gallusova dvorana"), At("SF, FKK: Virtuozno", "Cankarjev dom", "klasična"),
+        At("Božični koncert", "Kulturni dom Medvode"), At("Božični koncert", "Kulturni dom Kamnik"),
+        At("Zlati abonma: Dresdenska filharmonija", "Cankarjev dom"), At("Srebrni abonma: Mozart!", "Cankarjev dom"),
+        At("Mozart!", "")]);
+    if (merged.Count != 6 || merged.Single(e => e.Title.Contains("FKK")) is not { Id: "SF, FKK: Virtuozno", Genre: "klasična" }) throw new Exception($"merge\n{string.Join("\n", merged)}");
 
     var calls = 0;
     var none = await LoadEvents(today, today.AddDays(UpcomingDays), [], _ => { calls++; return Task.FromResult(new XDocument(new XElement("rss"))); });
